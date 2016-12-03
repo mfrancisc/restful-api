@@ -58,6 +58,7 @@ abstract class CrudModel
 
         $this->query .= " modified='" . date("Y-m-d H:i:s") . "'";
         $this->query .= " WHERE id=" . $this->getId();
+
         try {
             $exec = $this->_executeQuery($this->query);
 

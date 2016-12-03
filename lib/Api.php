@@ -47,11 +47,7 @@ abstract class Api
         // TODO
         // .....
 
-        $this->args = explode('/', $request->getRequest());
-        $this->api = $this->args[1];
-        $this->version = $this->args[2];
-        $this->endpoint = $this->args[3];
-        $this->method = $request->getMethod();
+        $this->_setParams($request); 
     }
 
     /**
@@ -154,6 +150,19 @@ abstract class Api
         header("Access-Control-Allow-Orgin: *");
         header("Access-Control-Allow-Methods: *");
         header("Content-Type: application/json");
+    }
+
+    /**
+     * Set parameters from request URI
+     * @param string $request 
+     */
+    private function _setParams(Request $request)
+    {
+        $this->args = explode('/', $request->getRequest());
+        $this->api = $this->args[1];
+        $this->version = $this->args[2];
+        $this->endpoint = $this->args[3];
+        $this->method = $request->getMethod();
     }
 
     /**
