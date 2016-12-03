@@ -1,12 +1,11 @@
 <?php
-
-require_once 'CrudModel.php';
+namespace lib\Model;
 
 /**
  * Class Post
  * Post model implementation
  */
-class Post extends CrudModel
+final class Post extends CrudModel
 {
     /**
      * @var int
@@ -33,7 +32,7 @@ class Post extends CrudModel
      * Post constructor.
      * @param null $postId
      */
-    public function __construct($postId = null)
+    public function __construct(int $postId = null)
     {
         $this->postId = $postId;
 
@@ -43,7 +42,7 @@ class Post extends CrudModel
     /**
      * @return int
      */
-    protected function getId()
+    protected function getId(): int
     {
         return $this->postId;
     }
@@ -51,7 +50,7 @@ class Post extends CrudModel
     /**
      * @return string
      */
-    protected function tableName()
+    protected function tableName(): string
     {
         return "posts";
     }
@@ -60,7 +59,7 @@ class Post extends CrudModel
      * editable fields
      * @return array
      */
-    protected function getFields()
+    protected function getFields(): array
     {
         return [
             'title',

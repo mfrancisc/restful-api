@@ -1,5 +1,5 @@
 <?php
-
+namespace lib;
 /**
  * Class Api
  * Extend this class to create your APIs
@@ -20,24 +20,38 @@ abstract class Api
     protected $method = '';
 
     /**
+     * HTTP status code and descriptions
+     */
+    protected $status = array(
+            200 => 'OK',
+            404 => 'Not Found',
+            405 => 'Method Not Allowed',
+            500 => 'Internal Server Error',
+        );
+
+    /**
+     * Custom API message
+     */
+    const RES_SUCESS = "Request completed successfully";
+    const RES_FAILURE = "Errors while executing request";
+
+    /**
      * @param $request
      * @param $method
      */
-    public function __construct($request, $method)
+    public function __construct(Request $request)
     {
-        header("Access-Control-Allow-Orgin: *");
-        header("Access-Control-Allow-Methods: *");
-        header("Content-Type: application/json");
+        $this->_setHeader();
 
         // ADD AUTHENTICATION LOGIC HERE
         // TODO
         // .....
 
-        $this->args = explode('/', $request);
+        $this->args = explode('/', $request->getRequest());
         $this->api = $this->args[1];
         $this->version = $this->args[2];
         $this->endpoint = $this->args[3];
-        $this->method = $method;
+        $this->method = $request->getMethod();
     }
 
     /**
@@ -86,7 +100,7 @@ abstract class Api
      * @param int $status
      * @return string
      */
-    protected function response($data, $status = 200)
+    protected function response($data,int $status = 200): string
     {
         header("HTTP/1.1 " . $status . " " . $this->_requestStatus($status));
 
@@ -94,26 +108,9 @@ abstract class Api
     }
 
     /**
-     * Handle status code and descriptions
-     * @param $code
-     * @return mixed
-     */
-    private function _requestStatus($code)
-    {
-        $status = array(
-            200 => 'OK',
-            404 => 'Not Found',
-            405 => 'Method Not Allowed',
-            500 => 'Internal Server Error',
-        );
-
-        return ($status[$code]) ? $status[$code] : $status[500];
-    }
-
-    /**
      * Choose which implementation method to call
      * based on the http request
-     * @return string
+     * @return string|mixed|bool
      */
     protected function handleRequest()
     {
@@ -147,5 +144,25 @@ abstract class Api
     protected function readInput()
     {
         return json_decode(file_get_contents("php://input"));
+    }
+    
+    /**
+     * Allow CORS and json content type
+     */
+    private function _setHeader()
+    {
+        header("Access-Control-Allow-Orgin: *");
+        header("Access-Control-Allow-Methods: *");
+        header("Content-Type: application/json");
+    }
+
+    /**
+     * Handle status code and descriptions
+     * @param $code
+     * @return string
+     */
+    private function _requestStatus($code): string
+    {
+        return ($this->status[$code]) ?? $this->status[500];
     }
 }

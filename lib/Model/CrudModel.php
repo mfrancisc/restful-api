@@ -1,5 +1,5 @@
 <?php
-
+namespace lib\Model;
 /**
  * Class CrudModel
  * defines abstraction for
@@ -12,30 +12,13 @@ abstract class CrudModel
      */
     private $query;
 
+
     /**
      * CrudModel constructor.
      */
     public function __construct()
     {
         return $this;
-    }
-
-    /**
-     * @return bool|string
-     */
-    public function delete()
-    {
-
-        try {
-            $this->query = "DELETE FROM " . $this->tableName();
-            $this->query .= " WHERE id= " . $this->getId();
-            $exec = $this->_executeQuery($this->query);
-
-            return $exec;
-        } catch (PDOException $e) {
-            return $e->getMessage();
-        }
-
     }
 
     /****************************************
@@ -47,53 +30,26 @@ abstract class CrudModel
      * return the db table name
      * @return mixed
      */
-    abstract protected function tableName();
+    abstract protected function tableName(): string;
 
     /**
      * return row id
      * @return mixed
      */
-    abstract protected function getId();
+    abstract protected function getId(): int;
 
     /**
      * return editable fields
      * @return mixed
      */
-    abstract protected function getFields();
+    abstract protected function getFields(): array;
     /** ---------------------------------- */
-
-    /**
-     * @param $sql string
-     * @param array $values
-     * @return bool
-     */
-    private function _executeQuery($sql, $values = array())
-    {
-        $dbConn = $this->_getDbConn();
-        $stmt = $dbConn->prepare($sql);
-        if ( ! empty($values)) $exec = $stmt->execute($values);
-        else $exec = $stmt->execute();
-
-        $stmt = null;
-        $dbConn = null;
-
-        return $exec;
-    }
-
-    /**
-     * Create the PDO connection
-     * @return PDO
-     */
-    private function _getDbConn()
-    {
-        return new PDO(DB_DSN, DB_USER, DB_PASS);
-    }
 
     /**
      * @param $post
      * @return bool|string
      */
-    public function update($post)
+    public function update(\stdClass $post)
     {
         $this->query = "UPDATE " . $this->tableName() . " set ";
         foreach ($this->getFields() as $field) {
@@ -106,37 +62,23 @@ abstract class CrudModel
             $exec = $this->_executeQuery($this->query);
 
             return $exec;
-        } catch (PDOException $e) {
+
+        } catch (\PDOException $e) {
             return $e->getMessage();
         }
     }
 
     /**
-     * @param $post
+     * @param $model
      * @return bool|string
      */
-    public function save($post)
+    public function save(\stdClass $model)
     {
-        $this->query = "INSERT INTO " . $this->tableName() . " (";
-        $values = [];
-        foreach ($this->getFields() as $cnt => $field) {
-            if (isset($post->$field)) $this->query .= $field . ", ";
-            $values[$cnt] = $post->$field;
-        }
-        $this->query .= " created)";
-        $this->query .= " VALUES(";
-        for ($i = 0; $i < count($this->getFields()); $i++)
-            $this->query .= "?, ";
-        $this->query .= "?)";
-        array_push($values, date("Y-m-d H:i:s"));
+        $callback = function($query, $values): bool {
+                return $this->_executeQuery($query, $values);
+        };
 
-        try {
-            $exec = $this->_executeQuery($this->query, $values);
-
-            return $exec;
-        } catch (PDOException $e) {
-            return $e->getMessage();
-        }
+        return $this->_insert($model, $callback);
     }
 
     /**
@@ -149,13 +91,13 @@ abstract class CrudModel
             $dbConn = $this->_getDbConn();
             $stmt = $dbConn->prepare($this->_selectAll());
             $stmt->execute();
-            $result = $stmt->fetchAll();
-
+            $result = $stmt->fetchAll(\PDO::FETCH_ASSOC);
             $stmt = null;
             $dbConn = null;
 
             return $result;
-        } catch (PDOException $e) {
+
+        } catch (\PDOException $e) {
             return $e->getMessage();
         }
 
@@ -165,31 +107,104 @@ abstract class CrudModel
      * @param $modelId
      * @return mixed|string
      */
-    public function fetch($modelId)
+    public function fetch()
     {
         try {
             $dbConn = $this->_getDbConn();
             $stmt = $dbConn->prepare($this->_selectAll() . ' WHERE id =:id');
-            $stmt->bindValue(':id', $modelId);
-            $stmt->execute();
-            $result = $stmt->fetch(PDO::FETCH_ASSOC);
-
+            $stmt->execute(array(':id'=>$this->getId()));
+            $result = $stmt->fetch(\PDO::FETCH_ASSOC);
 
             $stmt = null;
             $dbConn = null;
 
             return $result;
 
-        } catch (PDOException $e) {
+        } catch (\PDOException $e) {
             return $e->getMessage();
         }
     }
 
     /**
+     * @return bool|string
+     */
+    public function delete()
+    {
+            $this->query = "DELETE FROM " . $this->tableName();
+            $this->query .= " WHERE id= " . $this->getId();
+
+            return $this->_executeQuery($this->query);
+    }
+
+    /**
+     * Create the insert query string
+     * @param  \stdClass $model 
+     * @return string          
+     */
+    private function _insert(\stdClass $model, callable $callback): string 
+    {
+        $query = "INSERT INTO " . $this->tableName() . " (";
+        $values = [];
+        foreach ($this->getFields() as $cnt => $field) {
+            if (isset($model->$field)) $query .= $field . ", ";
+            $values[$cnt] = $model->$field;
+        }
+        $query .= " created)";
+        $query .= " VALUES(";
+        for ($i = 0; $i < count($this->getFields()); $i++)
+            $query .= "?, ";
+        $query .= "?)";
+        array_push($values, date("Y-m-d H:i:s"));
+        
+        return $callback($query, $values);  
+    }
+
+    /**
+     * @param $sql string
+     * @param array $values
+     * @return bool
+     */
+    private function _executeQuery(string $sql,array $values = array()): bool
+    {
+
+        try {
+            $dbConn = $this->_getDbConn();
+            $dbConn->beginTransaction();
+
+            $stmt = $dbConn->prepare($sql);
+            if ( ! empty($values)) $exec = $stmt->execute($values);
+            else $exec = $stmt->execute();
+
+            $dbConn->commit();
+
+            $stmt = null;
+            $dbConn = null;
+
+            return $exec;
+
+        } catch (\PDOException $e) {
+
+            if($dbConn) $dbConn->rollBack();
+
+            return $e->getMessage();
+        }
+
+    }
+
+    /**
+     * Create the PDO connection
+     * @return \PDO
+     */
+    private function _getDbConn(): \PDO
+    {
+        return new \PDO(DB_DSN, DB_USER, DB_PASS);
+    }
+
+    /**
      * @return string
      */
-    private function _selectAll()
+    private function _selectAll(): string
     {
-        return "SELECT * from " . $this->tableName();
+        return "SELECT * FROM " . $this->tableName();
     }
 }

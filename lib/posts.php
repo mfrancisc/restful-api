@@ -1,13 +1,15 @@
 <?php
-require_once 'Api.php';
-require_once 'Model' . DIRECTORY_SEPARATOR . 'Post.php';
+namespace lib;
+
+use lib\Api;
+use lib\Model\Post;
 
 /**
  * Class posts
  * posts Api implementation
  * save, update, read and delete posts
  */
-class posts extends Api
+final class posts extends Api
 {
 
     /**
@@ -20,31 +22,20 @@ class posts extends Api
      * @param $request
      * @param $method
      */
-    public function __construct($request, $method)
+    public function __construct(Request $request)
     {
-        parent::__construct($request, $method);
-        $this->postId = ($this->args[4]) ? $this->args[4] : null;
+        parent::__construct($request);
+        $this->postId = $this->args[4] ?? null;// null coalescing 
     }
 
     /**
      * this method must match with the
-     * route es: api/v1/posts
-     * @return string
+     * route endpoint es: api/v1/posts
+     * @return string|array
      */
-    protected function posts()
+    protected function posts() 
     {
         return $this->handleRequest();
-    }
-
-    /**
-     * @return bool|string
-     */
-    protected function delete()
-    {
-        if ( ! $this->postId) return $this->response("Post id is required");
-
-        return (new Post($this->postId))->delete();
-
     }
 
     /**
@@ -53,9 +44,11 @@ class posts extends Api
     protected function update()
     {
         $post = $this->readInput();
-        if ( ! $this->postId) return $this->response("Post id is required");
+        if ( ! $this->postId || !is_numeric($this->postId)) return $this->response("Invalid id!");
 
-        return (new Post($this->postId))->update($post);
+        $exec = ($this->_buildPost($this->postId))->update($post);
+
+        return $this->_result($exec);
     }
 
     /**
@@ -63,11 +56,10 @@ class posts extends Api
      */
     protected function read()
     {
-        $post = new Post();
         if ( ! $this->postId)
-            return $post->fetchAll();
+            return $this->_buildPost()->fetchAll();
 
-        return $post->fetch($this->postId);
+        return $this->_buildPost($this->postId)->fetch();
     }
 
     /**
@@ -78,8 +70,42 @@ class posts extends Api
 
         $post = $this->readInput();
 
-        return (new Post())->save($post);
+        $exec = ($this->_buildPost())->save($post);
 
+        return $this->_result($exec);
     }
+
+    /**
+     * @return bool|string
+     */
+    protected function delete()
+    {
+        if ( ! $this->postId || !is_numeric($this->postId)) return $this->response("Invalid id!");
+
+        $exec = ($this->_buildPost($this->postId))->delete();
+
+        return $this->_result($exec);
+    }
+
+    /**
+     * Return result description
+     * @param  bool   $exec 
+     * @return string       
+     */
+    private function _result(bool $exec): string
+    {
+        return ($exec) ? parent::RES_SUCESS : parent::RES_FAILURE;
+    }
+
+    /**
+     * Post model factory method
+     * @param  int|null $postId 
+     * @return Post           
+     */
+    private function _buildPost(int $postId = null): Post
+    {
+        return ($postId) ? new Post($postId) : new Post();
+    }
+
 }
 

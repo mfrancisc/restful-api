@@ -6,31 +6,60 @@
 // load db configurations
 require_once '.' . DIRECTORY_SEPARATOR . 'config' . DIRECTORY_SEPARATOR . 'db.php';
 
-// autoload function
-function __autoload($classname)
-{
-    $filename = $classname . ".php";
+// autoload apis
+spl_autoload_register(function ($class) {
+    $path = getcwd() . DIRECTORY_SEPARATOR . $class;
+    $split = explode('\\', $path);
+    $location = implode('/', $split) . '.php';
+    include $location;
+});
 
-
-    // default api path
-    $filePath = 'lib' . DIRECTORY_SEPARATOR . $filename;
-    if ( ! file_exists($filePath)) throw new Exception("No Api: " . $classname);
-
-    require_once $filePath;
-}
+// group use declarations
+use lib\{Request, posts, API};
 
 // handle API call
 try {
 
-    // parameters
-    $request = $_SERVER['PATH_INFO'];
+    // request info
+    $request = $_SERVER['REQUEST_URI'];
     $method = $_SERVER['REQUEST_METHOD'];
     $requestArray = explode('/', $request);
 
+    // anonymous classes
+    $Request = new class implements Request {
+        private $request;
+        private $method;
+        public function setRequest(string $request)
+        {
+            $this->request = $request;
+        }
+
+        public function getRequest(): string
+        {
+            return $this->request;
+        }
+
+        public function setMethod(string $method)
+        {
+            $this->method = $method;
+        }
+
+        public function getMethod(): string
+        {
+            return $this->method;
+        }
+
+
+    };
+
+    $Request->setRequest($request);
+    $Request->setMethod($method);
+
     // try to load requested api es: api/v1/apiname
-    $api = new $requestArray[3]($request, $method);
+    $api = new posts($Request);
     echo $api->run();
 
-} catch (Exception $e) {
-    echo json_encode(Array('error' => $e->getMessage()));
+// catch FATAL ERRORS
+} catch (Throwable $t) {
+    echo json_encode(array('error' => $t->getMessage()));
 }
